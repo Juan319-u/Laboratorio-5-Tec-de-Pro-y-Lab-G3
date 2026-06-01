@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es" ng-app="rutasApp">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rutas Turísticas</title>
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Leaflet (mapas) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body ng-controller="MainCtrl">
+
+<!-- ════════════ HEADER ════════════ -->
+<header>
+    <h1>🌍 Rutas Turísticas</h1>
+    <p>Gestión de rutas y paradas turísticas alrededor del mundo</p>
+</header>
+
+<!-- ════════════ NOTIFICACIÓN ════════════ -->
+<div class="notificacion"
+     ng-class="mensaje.tipo"
+     ng-show="mensaje.texto">
+    {{ mensaje.texto }}
+</div>
+
+<!-- ════════════ LAYOUT ════════════ -->
+<div class="layout">
+
+    <!-- ── Panel Ciudades ── -->
+    <aside class="panel-ciudades">
+        <h2>📋 1. Seleccione Ciudad</h2>
+        <div class="ciudad-item"
+             ng-repeat="c in ciudades"
+             ng-class="{ activa: ciudadSeleccionada && ciudadSeleccionada.id === c.id }"
+             ng-click="seleccionarCiudad(c)">
+            <div class="ciudad-nombre">{{ c.nombre }}</div>
+            <div class="pais-label">{{ c.pais.nombre }}</div>
+        </div>
+    </aside>
+
+    <!-- ── Panel Principal ── -->
+    <main class="panel-principal">
+
+        <!-- Placeholder inicial -->
+        <div class="placeholder" ng-if="!ciudadSeleccionada">
+            <div class="placeholder-icon">🗺️</div>
+            <p>Seleccione una ciudad para ver sus rutas turísticas</p>
+        </div>
+
+        <!-- ══ SECCIÓN RUTAS ══ -->
+        <div class="card" ng-if="ciudadSeleccionada">
+            <div class="card-header rutas-header">
+                <span>🚌 Rutas en: <strong>{{ ciudadSeleccionada.nombre }}</strong></span>
+                <button class="btn btn-agregar" ng-click="mostrarAgregarRuta()">+ Agregar Ruta</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre de la Ruta</th>
+                        <th>Tipo</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Formulario nueva/editar ruta -->
+                    <tr class="form-inline" ng-if="mostrarFormRuta">
+                        <td colspan="4">
+                            <div class="form-row">
+                                <input type="text" class="inp-nombre"
+                                       ng-model="nuevaRuta.nombre"
+                                       placeholder="Nombre de la ruta">
+                                <select class="sel-tipo" ng-model="nuevaRuta.tipo.id">
+                                    <option value="">-- Tipo --</option>
+                                    <option ng-repeat="t in tipos" value="{{ t.id }}">{{ t.nombre }}</option>
+                                </select>
+                                <input type="text" class="inp-desc"
+                                       ng-model="nuevaRuta.descripcion"
+                                       placeholder="Descripción">
+                                <button class="btn btn-guardar" ng-click="guardarRuta()">Guardar</button>
+                                <button class="btn btn-cancelar" ng-click="cancelarRuta()">✕</button>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Lista de rutas -->
+                    <tr ng-repeat="r in rutas"
+                        ng-class="{ 'ruta-seleccionada': rutaSeleccionada && rutaSeleccionada.id === r.id }"
+                        ng-click="seleccionarRuta(r)"
+                        style="cursor:pointer">
+                        <td>{{ r.id }}</td>
+                        <td><strong>{{ r.nombre }}</strong></td>
+                        <td><span class="badge">{{ r.tipo ? r.tipo.nombre : '—' }}</span></td>
+                        <td ng-click="$event.stopPropagation()">
+                            <button class="btn btn-editar"   ng-click="editarRuta(r)">Editar</button>
+                            <button class="btn btn-eliminar" ng-click="eliminarRuta(r.id)">Eliminar</button>
+                        </td>
+                    </tr>
+
+                    <!-- Sin rutas -->
+                    <tr ng-if="rutas.length === 0 && !mostrarFormRuta">
+                        <td colspan="4" style="text-align:center;color:#94a3b8;padding:24px">
+                            No hay rutas registradas para esta ciudad.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div><!-- /card rutas -->
+
+        <!-- ══ SECCIÓN PARADAS ══ -->
+        <div class="card" ng-if="rutaSeleccionada">
+            <div class="card-header paradas-header">
+                <span>🔴 Paradas de la Ruta: <strong>{{ rutaSeleccionada.nombre }}</strong></span>
+                <button class="btn btn-agregar" ng-click="mostrarAgregarParada()">+ Agregar Parada</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Orden</th>
+                        <th>Parada</th>
+                        <th>Coordenadas (Lat, Long)</th>
+                        <th>Tiempo</th>
+                        <th>Descripción</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Formulario nueva/editar parada -->
+                    <tr class="form-inline" ng-if="mostrarFormParada">
+                        <td colspan="7">
+                            <div class="form-row">
+                                <input type="number" class="inp-orden"
+                                       ng-model="nuevaParada.orden"
+                                       placeholder="Ord.">
+                                <input type="text" class="inp-nombre"
+                                       ng-model="nuevaParada.nombre"
+                                       placeholder="Nombre parada">
+                                <input type="number" class="inp-coords"
+                                       ng-model="nuevaParada.latitud"
+                                       placeholder="Latitud" step="0.0001">
+                                <input type="number" class="inp-coords"
+                                       ng-model="nuevaParada.longitud"
+                                       placeholder="Longitud" step="0.0001">
+                                <input type="number" class="inp-tiempo"
+                                       ng-model="nuevaParada.tiempo"
+                                       placeholder="Min.">
+                                <input type="text" class="inp-desc"
+                                       ng-model="nuevaParada.descripcion"
+                                       placeholder="Descripción corta">
+                                <button class="btn btn-guardar"  ng-click="guardarParada()">Guardar</button>
+                                <button class="btn btn-cancelar" ng-click="cancelarParada()">✕</button>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Lista de paradas -->
+                    <tr ng-repeat="p in paradas | orderBy:'orden'">
+                        <td>{{ p.id }}</td>
+                        <td>{{ p.orden }}</td>
+                        <td><strong>{{ p.nombre }}</strong></td>
+                        <td style="font-size:.8rem;color:#64748b">
+                            ({{ p.latitud | number:4 }}, {{ p.longitud | number:4 }})
+                        </td>
+                        <td>{{ p.tiempo }} min</td>
+                        <td style="font-size:.82rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                            {{ p.descripcion }}
+                        </td>
+                        <td>
+                            <button class="btn btn-editar"   ng-click="editarParada(p)">Editar</button>
+                            <button class="btn btn-eliminar" ng-click="eliminarParada(p.id)">Eliminar</button>
+                        </td>
+                    </tr>
+
+                    <!-- Sin paradas -->
+                    <tr ng-if="paradas.length === 0 && !mostrarFormParada">
+                        <td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">
+                            No hay paradas registradas para esta ruta.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div><!-- /card paradas -->
+
+        <!-- ══ MAPA ══ -->
+        <div class="mapa-card" ng-if="rutaSeleccionada">
+            <div class="mapa-titulo">🗺️ Mapa de la Ruta: {{ rutaSeleccionada.nombre }}</div>
+            <div id="mapa"></div>
+        </div>
+
+    </main>
+</div><!-- /layout -->
+
+<!-- ════════════ SCRIPTS ════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/services.js"></script>
+<script src="js/controllers.js"></script>
+
+</body>
+</html>
